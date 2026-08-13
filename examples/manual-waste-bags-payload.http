@@ -1,3 +1,8 @@
+### Manual: Waste Bags Collection
+POST http://localhost:3000/api/ingest/manual
+Content-Type: application/json
+x-api-key: dev-secret
+
 {
   "deviceId": "manual-entry-waste",
   "timestamp": "2026-08-13T11:00:00Z",

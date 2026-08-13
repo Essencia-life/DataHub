@@ -1,3 +1,8 @@
+### LoRa Water Tank Sensor
+POST http://localhost:3000/api/ingest/lora-tank
+Content-Type: application/json
+x-api-key: dev-secret
+
 {
   "deviceId": "essencia-water-tank-01",
   "timestamp": "2026-08-13T10:00:00Z",

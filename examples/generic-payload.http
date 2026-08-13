@@ -1,0 +1,13 @@
+### Generic Sensor Data
+POST http://localhost:3000/api/ingest/generic
+Content-Type: application/json
+x-api-key: dev-secret
+
+{
+  "deviceId": "sensor-01",
+  "timestamp": "2026-08-13T10:00:00Z",
+  "values": [
+    { "metric": "temperature_c", "value": 22.5, "unit": "C" },
+    { "metric": "humidity_pct", "value": 65.2, "unit": "%" }
+  ]
+}

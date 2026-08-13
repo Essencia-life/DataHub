@@ -1,3 +1,8 @@
+### Manual: Backup Generator Fuel
+POST http://localhost:3000/api/ingest/manual
+Content-Type: application/json
+x-api-key: dev-secret
+
 {
   "deviceId": "manual-entry-generator",
   "timestamp": "2026-08-13T10:30:00Z",
