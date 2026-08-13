@@ -1,0 +1,9 @@
+{
+  "deviceId": "essencia-studer-01",
+  "timestamp": "2026-08-13T10:05:00Z",
+  "values": [
+    { "metric": "pv_power_w", "value": 4200, "unit": "W" },
+    { "metric": "battery_soc_pct", "value": 87.5, "unit": "%" },
+    { "metric": "battery_voltage_v", "value": 51.2, "unit": "V" }
+  ]
+}

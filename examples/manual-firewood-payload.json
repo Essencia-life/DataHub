@@ -1,0 +1,9 @@
+{
+  "deviceId": "manual-entry-firewood",
+  "timestamp": "2026-08-13T12:30:00Z",
+  "category": "wood",
+  "metric": "firewood_purchased_kg",
+  "value": 120,
+  "unit": "kg",
+  "note": "Delivered firewood for the stove"
+}

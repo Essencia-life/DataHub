@@ -1,0 +1,8 @@
+{
+  "deviceId": "essencia-water-tank-01",
+  "timestamp": "2026-08-13T10:00:00Z",
+  "state": 0,
+  "waterLevelPercent": 68.4,
+  "levelCm": 83.2,
+  "signalDbm": -109
+}

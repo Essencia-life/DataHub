@@ -1,0 +1,9 @@
+{
+  "deviceId": "manual-entry-generator",
+  "timestamp": "2026-08-13T10:30:00Z",
+  "category": "fuel",
+  "metric": "backup_generator_fuel_used_l",
+  "value": 18.4,
+  "unit": "L",
+  "note": "Tank refill after generator test"
+}

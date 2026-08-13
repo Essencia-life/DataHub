@@ -1,0 +1,9 @@
+{
+  "deviceId": "manual-entry-waste",
+  "timestamp": "2026-08-13T11:00:00Z",
+  "category": "waste",
+  "metric": "waste_bags_removed_count",
+  "value": 12,
+  "unit": "bags",
+  "note": "Weekly waste collection"
+}
