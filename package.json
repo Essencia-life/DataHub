@@ -4,7 +4,7 @@
   "version": "1.0.0",
   "scripts": {
     "dev": "vercel dev",
-    "build": "tsc --noEmit",
+    "build": "./node_modules/typescript/bin/tsc --noEmit",
     "start": "vercel dev"
   },
   "dependencies": {
