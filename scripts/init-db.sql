@@ -20,3 +20,7 @@ CREATE INDEX IF NOT EXISTS idx_sensor_measurements_device_time
 
 CREATE INDEX IF NOT EXISTS idx_sensor_measurements_source_metric_time
   ON sensor_measurements (source, metric_name, captured_at DESC);
+
+-- One row per sample (see scripts/001-unique-sample-index.sql)
+CREATE UNIQUE INDEX IF NOT EXISTS uq_sensor_measurements_sample
+  ON sensor_measurements (device_id, source, sensor_name, metric_name, captured_at);
