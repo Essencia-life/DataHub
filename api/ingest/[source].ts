@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { z } from 'zod';
-import { insertSensorSample } from '../../lib/db';
+import { writeSamples } from '../../lib/routing';
 import {
   normalizeGenericPayload,
   normalizeLoraTankPayload,
@@ -54,14 +54,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(400).json({ ok: false, message: `Unsupported source: ${source}` });
     }
 
-    const inserts = await Promise.all(
-      normalizedRows.map(async (row) => insertSensorSample(row)),
-    );
+    const written = await writeSamples(source, normalizedRows);
 
     return res.status(200).json({
       ok: true,
       source,
-      inserted: inserts.length,
+      inserted: normalizedRows.length,
+      grafana: written.grafana,
+      neon: written.neon,
       message: 'Data ingested successfully',
     });
   } catch (error) {
