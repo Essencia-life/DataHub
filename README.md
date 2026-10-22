@@ -12,7 +12,10 @@ Grafana Cloud (live data, dashboards, alerting) and Neon (long-term archive).
 | `GET /api/health` | Health check. |
 
 A sender gets a 2xx only after all targets accepted the data. On a 5xx it should retry
-(the water tank receiver keeps unsent readings in a queue).
+(the water tank receiver and the Studer sensor keep unsent readings in a queue).
+
+`unit` of a metric is optional (status and counter values such as an operating state have none); it is
+stored as an empty string and the Grafana label `unit` is left out.
 
 ## Where data goes
 
@@ -22,6 +25,13 @@ A sender gets a 2xx only after all targets accepted the data. On a 5xx it should
 - **Manual entries** (`manual`: firewood, fuel, waste, ...) are rare events and are written directly to Neon.
 - Without `GRAFANA_*` variables everything is written to Neon, as before.
 - While `NEON_STREAM_WRITES` is not `false`, stream sources are also written to Neon (migration phase).
+
+**Data Grafana refuses:** Grafana Cloud only accepts samples up to 2 hours behind the newest sample of a
+series. After a longer outage a sender delivers its backlog with the original timestamps, and Grafana may
+answer HTTP 400. Retrying cannot fix that and would block the sender's queue (the water tank receiver
+retries the oldest reading forever), so the Datahub answers with 2xx, stores those samples in Neon instead
+and reports `grafanaRejected` in the response. Look for `Grafana rejected the data` in the Vercel logs.
+Temporary problems (timeout, 429, 5xx) and a wrong token (401/403) still return 5xx, so the sender retries.
 
 Adding a new sensor needs no Grafana-side code: send it to `generic` (or add a normalizer in
 `lib/validation.ts`) and the metrics show up in Grafana automatically.
@@ -40,8 +50,9 @@ Adding a new sensor needs no Grafana-side code: send it to `generic` (or add a n
 
 `GET /api/export` runs once a day via Vercel Cron (`vercel.json`, Hobby plan: once per day, the exact
 time can vary by up to an hour). It reads the last 30 hours of `datahub_*` series back from Grafana
-Cloud and stores them in `sensor_measurements`: the water tank raw, `studer-xcom` as 5-minute averages
-(`EXPORT_BUCKETS`). Only complete buckets are exported and existing rows are skipped, so runs can overlap
+Cloud and stores them in `sensor_measurements`: the water tank raw, `studer-xcom` as 5-minute values
+(`EXPORT_BUCKETS`): the average, except for metrics without a unit (states, counters) and cumulative ones
+like `*_today_*`, which keep the last value of the bucket (`EXPORT_LAST_VALUE_PATTERN`). Only complete buckets are exported and existing rows are skipped, so runs can overlap
 and a missed day is caught up by the next one. Neon therefore wakes up about once a day.
 
 Switch-over, in this order:

@@ -1,7 +1,13 @@
 import { timingSafeEqual } from 'node:crypto';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { insertSensorSamplesBatch } from '../lib/db';
-import { buildExportRows, getGrafanaQueryConfig, parseBuckets, queryRecentSeries } from '../lib/export';
+import {
+  buildExportRows,
+  getGrafanaQueryConfig,
+  parseBuckets,
+  parseLastValuePattern,
+  queryRecentSeries,
+} from '../lib/export';
 
 /**
  * Daily archive export: Grafana Cloud -> Neon.
@@ -74,7 +80,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const now = Date.now();
     const series = await queryRecentSeries(config, lookbackHours, now);
-    const rows = buildExportRows(series, now, parseBuckets(process.env.EXPORT_BUCKETS));
+    const rows = buildExportRows(
+      series,
+      now,
+      parseBuckets(process.env.EXPORT_BUCKETS),
+      parseLastValuePattern(process.env.EXPORT_LAST_VALUE_PATTERN),
+    );
     const inserted = await insertSensorSamplesBatch(rows);
 
     return res.status(200).json({
