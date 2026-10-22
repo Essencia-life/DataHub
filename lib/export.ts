@@ -40,6 +40,25 @@ export type PromSeries = {
 export const DEFAULT_BUCKETS = 'studer-xcom=300';
 
 /**
+ * Metrics whose bucket value is the LAST sample instead of the average:
+ * - everything without a unit (operating state, relay, overload counter, ...): the average of
+ *   two states is meaningless
+ * - cumulative values such as "energy today": the last value is the value at the end of the bucket
+ * The pattern (regular expression, tested against the metric name) can be changed with
+ * EXPORT_LAST_VALUE_PATTERN.
+ */
+export const DEFAULT_LAST_VALUE_PATTERN = '_today|_total|_prev_day';
+
+export function parseLastValuePattern(value: string | undefined = DEFAULT_LAST_VALUE_PATTERN): RegExp {
+  try {
+    return new RegExp(value);
+  } catch {
+    console.error(`Invalid EXPORT_LAST_VALUE_PATTERN ${JSON.stringify(value)}, using the default`);
+    return new RegExp(DEFAULT_LAST_VALUE_PATTERN);
+  }
+}
+
+/**
  * "source=seconds" list. Sources listed here are exported as averages over fixed
  * time buckets (aligned to the epoch); all other sources are exported raw.
  */
@@ -105,14 +124,16 @@ export async function queryRecentSeries(
 
 /**
  * Converts Prometheus series into archive rows.
- * - Sources with a bucket size are averaged per bucket; only buckets that are already complete
- *   are exported, so a later run can never produce a different value for the same bucket.
+ * - Sources with a bucket size are aggregated per bucket (average, or the last value for status
+ *   and cumulative metrics, see DEFAULT_LAST_VALUE_PATTERN); only buckets that are already
+ *   complete are exported, so a later run can never produce a different value for the same bucket.
  * - Other sources are exported raw, one row per stored sample.
  */
 export function buildExportRows(
   series: PromSeries[],
   nowMs: number,
   buckets: Map<string, number>,
+  lastValuePattern: RegExp = new RegExp(DEFAULT_LAST_VALUE_PATTERN),
 ): SensorSampleRecord[] {
   const prefix = `${GRAFANA_MEASUREMENT}_`;
   const rows: SensorSampleRecord[] = [];
@@ -137,7 +158,8 @@ export function buildExportRows(
 
     const samples = entry.values
       .map(([timestamp, value]) => [Number(timestamp), Number(value)] as const)
-      .filter(([timestamp, value]) => Number.isFinite(timestamp) && Number.isFinite(value));
+      .filter(([timestamp, value]) => Number.isFinite(timestamp) && Number.isFinite(value))
+      .sort((a, b) => a[0] - b[0]);
 
     const bucketSize = buckets.get(source);
 
@@ -153,8 +175,9 @@ export function buildExportRows(
       continue;
     }
 
+    const useLastValue = base.unit === '' || lastValuePattern.test(base.metricName);
     const cutoff = Math.floor(nowSeconds / bucketSize) * bucketSize;
-    const grouped = new Map<number, { sum: number; count: number }>();
+    const grouped = new Map<number, { sum: number; count: number; last: number }>();
 
     for (const [timestamp, value] of samples) {
       const bucketStart = Math.floor(timestamp / bucketSize) * bucketSize;
@@ -163,18 +186,25 @@ export function buildExportRows(
         continue; // bucket is still being filled
       }
 
-      const current = grouped.get(bucketStart) ?? { sum: 0, count: 0 };
+      const current = grouped.get(bucketStart) ?? { sum: 0, count: 0, last: value };
       current.sum += value;
       current.count += 1;
+      current.last = value; // samples are sorted by time
       grouped.set(bucketStart, current);
     }
 
-    for (const [bucketStart, { sum, count }] of grouped) {
+    for (const [bucketStart, { sum, count, last }] of grouped) {
       rows.push({
         ...base,
-        value: sum / count,
+        value: useLastValue ? last : sum / count,
         capturedAt: new Date(bucketStart * 1000).toISOString(),
-        metadata: { rawSource: source, via: 'grafana-export', bucketSeconds: bucketSize, samples: count },
+        metadata: {
+          rawSource: source,
+          via: 'grafana-export',
+          bucketSeconds: bucketSize,
+          samples: count,
+          aggregation: useLastValue ? 'last' : 'avg',
+        },
       });
     }
   }
