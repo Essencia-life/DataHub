@@ -1,5 +1,8 @@
 {
   "version": 2,
   "framework": null,
-  "outputDirectory": "."
+  "outputDirectory": ".",
+  "crons": [
+    { "path": "/api/export", "schedule": "17 3 * * *" }
+  ]
 }
