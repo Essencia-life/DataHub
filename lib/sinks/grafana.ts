@@ -13,6 +13,21 @@ import type { NormalizedSample } from '../validation';
 export const GRAFANA_MEASUREMENT = 'datahub';
 export const GRAFANA_PUSH_TIMEOUT_MS = 8000;
 
+/**
+ * Grafana refused the data itself (HTTP 400), e.g. a sample older than its out-of-order window
+ * ("out of bounds"). Sending the same data again can never succeed, in contrast to timeouts,
+ * rate limits (429), server errors (5xx) or a wrong token (401/403).
+ */
+export class GrafanaRejectedError extends Error {
+  readonly status: number;
+
+  constructor(status: number, detail: string) {
+    super(`Grafana rejected the data: HTTP ${status} ${detail}`.trim());
+    this.name = 'GrafanaRejectedError';
+    this.status = status;
+  }
+}
+
 export type GrafanaConfig = {
   /** Full push URL, e.g. https://<metrics-endpoint>/api/v1/push/influx/write */
   url: string;
@@ -117,6 +132,11 @@ export async function pushToGrafana(
 
     if (!response.ok) {
       const detail = (await response.text().catch(() => '')).slice(0, 300);
+
+      if (response.status === 400) {
+        throw new GrafanaRejectedError(response.status, detail);
+      }
+
       throw new Error(`Grafana push failed: HTTP ${response.status} ${detail}`.trim());
     }
 

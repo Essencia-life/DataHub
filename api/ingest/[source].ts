@@ -62,6 +62,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       inserted: normalizedRows.length,
       grafana: written.grafana,
       neon: written.neon,
+      grafanaRejected: written.grafanaRejected,
       message: 'Data ingested successfully',
     });
   } catch (error) {

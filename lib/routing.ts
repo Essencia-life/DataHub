@@ -1,5 +1,5 @@
 import { insertSensorSample } from './db';
-import { getGrafanaConfig, pushToGrafana } from './sinks/grafana';
+import { getGrafanaConfig, GrafanaRejectedError, pushToGrafana } from './sinks/grafana';
 import type { NormalizedSample } from './validation';
 
 /**
@@ -11,6 +11,9 @@ import type { NormalizedSample } from './validation';
  * - Without Grafana credentials everything is written to Neon, exactly like before.
  * - NEON_STREAM_WRITES=false switches the direct Neon writes for stream sources off
  *   (do this once the daily export from Grafana to Neon is running). Default: keep writing.
+ * - If Grafana refuses the data itself (HTTP 400, e.g. samples older than its 2 h out-of-order
+ *   window after a long outage), retrying cannot help and would block the sender's queue forever.
+ *   The samples are then written to Neon instead and the request still succeeds.
  */
 
 type Env = Record<string, string | undefined>;
@@ -40,25 +43,42 @@ export function resolveTargets(source: string, env: Env = process.env): Targets 
   return { grafana: true, neon: env.NEON_STREAM_WRITES !== 'false' };
 }
 
-export type WriteResult = { grafana: number; neon: number };
+export type WriteResult = {
+  grafana: number;
+  neon: number;
+  /** Number of samples Grafana refused permanently; they were stored in Neon instead. */
+  grafanaRejected: number;
+};
 
 /**
  * Writes samples to all targets of the source. Every target is attempted; if any of them
- * fails the error is thrown afterwards, so the sender gets a 5xx and retries instead of
- * silently losing the data on one side.
+ * fails temporarily the error is thrown afterwards, so the sender gets a 5xx and retries instead
+ * of silently losing the data on one side.
  */
 export async function writeSamples(source: string, samples: NormalizedSample[]): Promise<WriteResult> {
   const targets = resolveTargets(source);
-  const result: WriteResult = { grafana: 0, neon: 0 };
+  const result: WriteResult = { grafana: 0, neon: 0, grafanaRejected: 0 };
   const failures: unknown[] = [];
+  let rejectedByGrafana = false;
 
   const jobs: Array<Promise<void>> = [];
 
   if (targets.grafana) {
     jobs.push(
-      pushToGrafana(samples).then(({ sent }) => {
-        result.grafana = sent;
-      }),
+      pushToGrafana(samples).then(
+        ({ sent }) => {
+          result.grafana = sent;
+        },
+        (error: unknown) => {
+          if (error instanceof GrafanaRejectedError) {
+            rejectedByGrafana = true;
+            console.error(`${error.message} (source ${source}, ${samples.length} samples)`);
+            return;
+          }
+
+          throw error;
+        },
+      ),
     );
   }
 
@@ -75,6 +95,20 @@ export async function writeSamples(source: string, samples: NormalizedSample[]):
   for (const entry of settled) {
     if (entry.status === 'rejected') {
       failures.push(entry.reason);
+    }
+  }
+
+  if (rejectedByGrafana) {
+    result.grafanaRejected = samples.length;
+
+    // Not yet written to Neon (stream writes are switched off): keep the data there.
+    if (!targets.neon && failures.length === 0) {
+      try {
+        await Promise.all(samples.map((sample) => insertSensorSample(sample)));
+        result.neon = samples.length;
+      } catch (error) {
+        failures.push(error);
+      }
     }
   }
 
