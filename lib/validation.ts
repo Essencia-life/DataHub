@@ -1,9 +1,18 @@
 import { z } from 'zod';
 
+/**
+ * Unit of a metric. Status and counter values (operating state, relay, overload count, ...) have
+ * none, so senders may omit it or send null; it is stored as an empty string.
+ */
+export const optionalUnitSchema = z
+  .string()
+  .nullish()
+  .transform((unit) => unit?.trim() ?? '');
+
 export const inboundMetricSchema = z.object({
   metric: z.string().min(1),
   value: z.number(),
-  unit: z.string().min(1),
+  unit: optionalUnitSchema,
 });
 
 export const genericPayloadSchema = z.object({
@@ -121,13 +130,7 @@ export function normalizeStuderXcomPayload(rawBody: unknown): NormalizedSample[]
       timestamp: z.string().refine((value) => !Number.isNaN(Date.parse(value)), {
         message: 'timestamp must be a valid ISO date string',
       }),
-      values: z.array(
-        z.object({
-          metric: z.string().min(1),
-          value: z.number(),
-          unit: z.string().min(1),
-        }),
-      ),
+      values: z.array(inboundMetricSchema),
     })
     .parse(rawBody);
 

@@ -9,6 +9,7 @@ x-api-key: dev-secret
   "values": [
     { "metric": "pv_power_w", "value": 4200, "unit": "W" },
     { "metric": "battery_soc_pct", "value": 87.5, "unit": "%" },
-    { "metric": "battery_voltage_v", "value": 51.2, "unit": "V" }
+    { "metric": "battery_voltage_v", "value": 51.2, "unit": "V" },
+    { "metric": "xt1_operating_state", "value": 3, "unit": null }
   ]
 }
