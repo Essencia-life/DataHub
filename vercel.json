@@ -3,6 +3,6 @@
   "framework": null,
   "outputDirectory": ".",
   "crons": [
-    { "path": "/api/export", "schedule": "17 3 * * *" }
+    { "path": "/api/export", "schedule": "7 10 * * *" }
   ]
 }
